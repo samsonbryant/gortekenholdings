@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #2E8B57;
+    --color-primary-dark: #006400;
+    --color-secondary: #FFD700;
+    --color-secondary-dark: #DAA520;
+  }
+
+  body {
+    @apply m-0 min-h-screen bg-white text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors duration-200;
+  }
+
+  .container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+}
+
+/* Custom styles that don't fit into Tailwind classes */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Remove default button styles */
+button {
+  @apply appearance-none;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus styles */
+*:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2;
+}

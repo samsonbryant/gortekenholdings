@@ -1,0 +1,61 @@
+/* Slider custom styles */
+.home-slider .slick-dots {
+  bottom: 25px;
+  z-index: 10;
+}
+
+.home-slider .slick-dots li button:before {
+  color: white;
+  opacity: 0.5;
+  font-size: 12px;
+}
+
+.home-slider .slick-dots li.slick-active button:before {
+  color: white;
+  opacity: 1;
+}
+
+.home-slider .slick-prev,
+.home-slider .slick-next {
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+}
+
+.home-slider .slick-prev {
+  left: 20px;
+}
+
+.home-slider .slick-next {
+  right: 20px;
+}
+
+.home-slider .slick-prev:before,
+.home-slider .slick-next:before {
+  font-size: 40px;
+  opacity: 0.8;
+}
+
+.home-slider .slick-slide {
+  position: relative;
+}
+
+/* Animation for text */
+.home-slider .slick-active h2 {
+  animation: slideUp 0.8s ease-out forwards;
+}
+
+.home-slider .slick-active p {
+  animation: slideUp 0.8s ease-out 0.2s forwards;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 
