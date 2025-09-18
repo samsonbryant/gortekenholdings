@@ -3,29 +3,28 @@ import mongoose from 'mongoose';
 const contactSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Name is required'],
+    required: true,
     trim: true
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: true,
     trim: true,
-    lowercase: true,
-    match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, 'Please enter a valid email']
+    lowercase: true
   },
   phone: {
     type: String,
+    required: true,
     trim: true
   },
   message: {
     type: String,
-    required: [true, 'Message is required'],
-    trim: true
+    required: true
   },
   status: {
     type: String,
-    enum: ['pending', 'responded', 'closed'],
-    default: 'pending'
+    enum: ['new', 'read', 'responded'],
+    default: 'new'
   },
   createdAt: {
     type: Date,

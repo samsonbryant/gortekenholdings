@@ -1,9 +1,12 @@
 services:
+  # Backend API Service
   - type: web
     name: gorteken-api
     env: node
-    buildCommand: npm install
-    startCommand: node server/index.js
+    region: oregon
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -11,12 +14,29 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: gorteken-frontend
+          property: url
+    healthCheckPath: /
     
+  # Frontend Static Site
   - type: web
     name: gorteken-frontend
     env: static
+    region: oregon
+    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: gorteken-api
+          property: url
     routes:
       - type: rewrite
         source: /*

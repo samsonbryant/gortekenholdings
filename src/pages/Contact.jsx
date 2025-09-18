@@ -3,6 +3,14 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:5000/api';
 
+const api = axios.create({
+  baseURL: 'http://localhost:5000',
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
 const Contact = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -38,7 +46,7 @@ const Contact = () => {
         throw new Error('Please enter a valid email address');
       }
 
-      const response = await axios.post(`${API_URL}/forms/contact`, formData);
+      const response = await axios.post('http://localhost:5000/api/forms/contact', formData);
       
       setStatus({
         type: 'success',

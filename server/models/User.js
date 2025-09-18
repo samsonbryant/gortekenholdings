@@ -9,23 +9,25 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     lowercase: true,
-    match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, 'Please enter a valid email']
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
   },
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [8, 'Password must be at least 8 characters long']
+    minlength: [6, 'Password must be at least 6 characters']
   },
   emailVerified: {
     type: Boolean,
     default: false
   },
-  refreshToken: {
-    type: String
-  },
   verificationToken: String,
+  verificationTokenExpires: Date,
+  refreshToken: String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  lastLogin: {
+    type: Date
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -34,9 +36,11 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
   try {
+    if (!this.isModified('password')) {
+      return next();
+    }
+
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
@@ -45,18 +49,33 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Method to compare password for login
+// Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
-    throw error;
+    throw new Error('Password comparison failed');
   }
 };
 
-// Method to generate refresh token
+// Generate refresh token
 userSchema.methods.generateRefreshToken = function() {
-  return crypto.randomBytes(40).toString('hex');
+  const token = crypto.randomBytes(40).toString('hex');
+  this.refreshToken = token;
+  return token;
+};
+
+// Generate verification token
+userSchema.methods.generateVerificationToken = function() {
+  const token = crypto.randomBytes(32).toString('hex');
+  this.verificationToken = token;
+  this.verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+  return token;
+};
+
+// Check if email is verified
+userSchema.methods.isEmailVerified = function() {
+  return this.emailVerified === true;
 };
 
 const User = mongoose.model('User', userSchema);

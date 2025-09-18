@@ -3,58 +3,76 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import authRoutes from './routes/auth.js';
 import formRoutes from './routes/forms.js';
+import contactRoutes from './routes/contact.js';
+import careerRoutes from './routes/career.js';
+import connectDB from './config/database.js';
+import paymentRoutes from './routes/payment.js';
 
-dotenv.config();
+// Get the directory name of the current module
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load environment variables from the root directory
+dotenv.config({ path: join(__dirname, '.env') });
 
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
+
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({
-    success: false,
-    error: err.message || 'Internal Server Error'
+// Health check route
+app.get('/', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Gorteken API is running', 
+    timestamp: new Date().toISOString() 
   });
 });
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/forms', formRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/career', careerRoutes);
+app.use('/api/payments', paymentRoutes);
 
-// MongoDB connection with retry logic
-const connectDB = async (retries = 5) => {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-    });
-    console.log('Connected to MongoDB Atlas');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    if (retries > 0) {
-      console.log(`Retrying connection... (${retries} attempts left)`);
-      setTimeout(() => connectDB(retries - 1), 5000);
-    } else {
-      console.error('Failed to connect to MongoDB after multiple retries');
-      process.exit(1); // Exit the process if we can't connect to the database
-    }
-  }
-};
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || 'Internal Server Error'
+  });
+});
 
-// Initial connection
+// Connect to MongoDB
 connectDB();
 
 // Handle MongoDB connection events

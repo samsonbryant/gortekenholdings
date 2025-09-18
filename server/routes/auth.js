@@ -1,8 +1,10 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { auth } from '../middleware/auth.js';
 import crypto from 'crypto';
+import { sendVerificationEmail, sendWelcomeEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -35,8 +37,16 @@ const setTokenCookies = (res, { accessToken, refreshToken }) => {
 // Register
 router.post('/signup', async (req, res) => {
   try {
+    console.log('Signup request received:', req.body);
     const { email, password } = req.body;
-    
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide both email and password'
+      });
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -46,49 +56,148 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Create verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-
     // Create new user
     const user = new User({
       email,
-      password,
-      verificationToken
+      password // Will be hashed by the pre-save middleware
     });
 
-    await user.save();
+    // Generate verification token
+    const verificationToken = user.generateVerificationToken();
 
-    // Generate tokens
-    const tokens = generateTokens(user._id);
-    user.refreshToken = tokens.refreshToken;
+    await user.save();
+    console.log('User saved successfully:', user._id);
+
+    // Generate JWT tokens
+    const accessToken = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = user.generateRefreshToken();
+    user.refreshToken = refreshToken;
     await user.save();
 
     // Set cookies
-    setTokenCookies(res, tokens);
+    res.cookie('token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000 // 15 minutes
+    });
 
-    // TODO: Send verification email
-    
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     res.status(201).json({
       success: true,
       user: {
         id: user._id,
         email: user.email,
         emailVerified: user.emailVerified
-      }
+      },
+      token: accessToken,
+      refreshToken: refreshToken
     });
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(400).json({
+    res.status(500).json({
       success: false,
-      error: error.message || 'Failed to create account'
+      error: 'Failed to create account'
     });
+  }
+});
+
+// Email verification
+router.get('/verify-email/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // Find user with matching token that hasn't expired
+    const user = await User.findOne({
+      verificationToken: token,
+      verificationTokenExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired verification token'
+      });
+    }
+
+    // Update user
+    user.emailVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+    await user.save();
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(user.email);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully'
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify email'
+    });
+  }
+});
+
+// Resend verification email
+router.post('/resend-verification', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ error: 'Email is already verified' });
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    user.verificationToken = verificationToken;
+    user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    await user.save();
+
+    // Send new verification email
+    await sendVerificationEmail(user.email, verificationToken);
+
+    res.json({ message: 'Verification email sent successfully' });
+  } catch (error) {
+    console.error('Error resending verification email:', error);
+    res.status(500).json({ error: 'Failed to resend verification email' });
   }
 });
 
 // Login
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login request received:', req.body);
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide both email and password'
+      });
+    }
 
     // Find user
     const user = await User.findOne({ email });
@@ -108,13 +217,37 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
     // Generate tokens
-    const tokens = generateTokens(user._id);
-    user.refreshToken = tokens.refreshToken;
+    const accessToken = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = user.generateRefreshToken();
+    user.refreshToken = refreshToken;
     await user.save();
 
     // Set cookies
-    setTokenCookies(res, tokens);
+    res.cookie('token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000 // 15 minutes
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    console.log('Login successful for user:', user._id);
 
     res.json({
       success: true,
@@ -122,13 +255,15 @@ router.post('/login', async (req, res) => {
         id: user._id,
         email: user.email,
         emailVerified: user.emailVerified
-      }
+      },
+      token: accessToken,
+      refreshToken: refreshToken
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(400).json({
+    res.status(500).json({
       success: false,
-      error: error.message || 'Failed to login'
+      error: 'Failed to login'
     });
   }
 });
@@ -178,7 +313,10 @@ router.post('/refresh-token', async (req, res) => {
 // Get current user
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password -refreshToken');
+    console.log('Get current user request received');
+    const user = await User.findById(req.user.userId)
+      .select('-password -refreshToken');
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -195,7 +333,7 @@ router.get('/me', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    console.error('Get current user error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get user information'
@@ -204,20 +342,16 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // Logout
-router.post('/logout', auth, async (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
-    // Clear refresh token in database
-    const user = await User.findById(req.user.userId);
-    if (user) {
-      user.refreshToken = null;
-      await user.save();
-    }
-
     // Clear cookies
     res.clearCookie('token');
     res.clearCookie('refreshToken');
 
-    res.json({ success: true });
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({
@@ -272,26 +406,6 @@ router.post('/reset-password/:token', async (req, res) => {
     await user.save();
 
     res.json({ message: 'Password reset successful' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// Verify email
-router.get('/verify-email/:token', async (req, res) => {
-  try {
-    const { token } = req.params;
-    const user = await User.findOne({ verificationToken: token });
-
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid verification token' });
-    }
-
-    user.emailVerified = true;
-    user.verificationToken = undefined;
-    await user.save();
-
-    res.json({ message: 'Email verified successfully' });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
