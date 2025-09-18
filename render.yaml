@@ -19,8 +19,9 @@ services:
     healthCheckPath: /
     
   # Frontend Static Site
-  - type: static
+  - type: web
     name: gorteken-frontend
+    env: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     routes:
