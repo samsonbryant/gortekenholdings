@@ -15,8 +15,15 @@ import paymentRoutes from './routes/payment.js';
 // Get the directory name of the current module
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Load environment variables from the root directory
-dotenv.config({ path: join(__dirname, '.env') });
+// Load environment variables
+dotenv.config();
+
+// Debug: Log environment info (don't log sensitive data in production)
+console.log('Starting server...');
+console.log('Node ENV:', process.env.NODE_ENV);
+console.log('Port:', process.env.PORT || 5000);
+console.log('MongoDB URI provided:', !!process.env.MONGODB_URI);
+console.log('JWT Secret provided:', !!process.env.JWT_SECRET);
 
 const app = express();
 
@@ -87,7 +94,12 @@ app.use((err, req, res, next) => {
 });
 
 // Connect to MongoDB
-connectDB();
+try {
+  connectDB();
+} catch (error) {
+  console.error('Failed to connect to MongoDB:', error);
+  process.exit(1);
+}
 
 // Handle MongoDB connection events
 mongoose.connection.on('connected', () => {
