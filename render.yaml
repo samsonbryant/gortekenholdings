@@ -16,27 +16,13 @@ services:
         sync: false
       - key: PORT
         value: 10000
-      - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: gorteken-frontend
-          property: url
     healthCheckPath: /
     
   # Frontend Static Site
-  - type: web
+  - type: static
     name: gorteken-frontend
-    env: static
-    region: oregon
-    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: gorteken-api
-          property: url
     routes:
       - type: rewrite
         source: /*

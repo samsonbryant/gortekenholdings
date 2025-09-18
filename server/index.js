@@ -31,14 +31,28 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
+// In production, also allow any Render frontend URLs
+if (process.env.NODE_ENV === 'production') {
+  allowedOrigins.push(/^https:\/\/.*\.onrender\.com$/);
+}
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.includes(origin)) {
+    // Check exact matches
+    if (allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return allowed === origin;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    })) {
       return callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       return callback(new Error('Not allowed by CORS'));
     }
   },

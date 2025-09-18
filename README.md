@@ -103,9 +103,10 @@ This project is configured for deployment on Render using the `render.yaml` file
    For the backend service (`gorteken-api`), configure these environment variables in Render:
    - `MONGODB_URI`: Your MongoDB Atlas connection string
    - `JWT_SECRET`: A secure random string for JWT token signing
-   - `NODE_ENV`: Set to `production`
-   - `PORT`: Set to `10000` (Render default)
-   - `FRONTEND_URL`: Will be automatically set from the frontend service URL
+   - `NODE_ENV`: Set to `production` (automatically set)
+   - `PORT`: Set to `10000` (automatically set)
+   
+   Note: The frontend will automatically detect the API URL based on Render's naming convention.
 
 4. **Deploy:**
    - Click "Apply" to deploy both services
@@ -120,11 +121,11 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database_name
 JWT_SECRET=your_super_secret_jwt_key_here
 NODE_ENV=production
 PORT=10000
-FRONTEND_URL=https://your-frontend-url.onrender.com
 ```
 
-**Frontend (.env in root directory):**
+**Frontend (.env in root directory - Optional):**
 ```env
+# Only needed if you want to override the automatic API URL detection
 VITE_API_URL=https://your-api-url.onrender.com
 ```
 

@@ -1,7 +1,28 @@
 import axios from 'axios';
 
+// Determine the API base URL
+const getApiBaseUrl = () => {
+  // If VITE_API_URL is set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return `${import.meta.env.VITE_API_URL}/api`;
+  }
+  
+  // In production, try to detect the API URL automatically
+  if (import.meta.env.PROD) {
+    const currentHost = window.location.host;
+    // If we're on a Render frontend, try to guess the API URL
+    if (currentHost.includes('onrender.com')) {
+      const apiHost = currentHost.replace('gorteken-frontend', 'gorteken-api');
+      return `https://${apiHost}/api`;
+    }
+  }
+  
+  // Default to localhost for development
+  return 'http://localhost:5000/api';
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
